@@ -1,0 +1,100 @@
+# Research-14K Dataset License
+
+This license ("License") governs the use, modification, and distribution of the Research-14K dataset ("the Dataset"). This License is designed to promote responsible academic use while protecting the integrity of the scientific process.
+
+## 1. Scope and Acceptance
+
+1.1. This License applies to any access, use, modification, or distribution of the Dataset.
+
+1.2. By accessing, using, modifying, or distributing the Dataset, you agree to be bound by the terms and conditions of this License.
+
+## 2. User Registration Requirements
+
+2.1.  We highly encourage users to provide the following information:
+    *   Full Name
+    *   Academic/Research Affiliation
+    *   Institutional Email
+    *   Intended Use Description
+
+
+## 3. Permitted Uses
+
+3.1.  Subject to the restrictions in Section 4, you may use the Dataset for:
+    *   Academic research and development
+    *   Training and evaluating machine learning models
+    *   Benchmarking and comparison of algorithms
+    *   Reproducibility studies
+    *   Educational purposes
+
+3.2  "Research Purposes" means uses that:
+    *  Are primarily for academic or scientific advancement.
+    *  Do not involve direct commercial exploitation of the *raw* dataset.
+    *  Are conducted with proper attribution (see Section 5).
+
+## 4. Restrictions
+
+4.1. Redistribution:
+    *   You may share/redistribute/modified derived datasets (e.g., subsets, features extracted from the Dataset) *if* you clearly cite the original Research-14K Dataset and this License.
+
+4.2. Commercial Use:
+    *   Direct commercial use of the *raw* Dataset is prohibited without explicit written permission from the dataset creators.
+    *  If you have questions regarding commerical use, you are required to contact wengsyx@gmail.com.
+
+4.3. Prohibited Uses:
+    *   Use of the Dataset for any illegal or unethical purpose.
+    *   Use of the Dataset in a way that violates the privacy or intellectual property rights of others.
+    *   Use of the Dataset to create or distribute harmful content.
+    *   Use of the Dataset for creating academic papers without acknowledging the proper source.
+
+## 5. Required Acknowledgments
+
+5.1. All publications, presentations, or projects that use the Dataset must include the following citation:
+
+```
+@inproceedings{
+weng2025cycleresearcher,
+title={CycleResearcher: Improving Automated Research via Automated Review},
+author={Yixuan Weng and Minjun Zhu and Guangsheng Bao and Hongbo Zhang and Jindong Wang and Yue Zhang and Linyi Yang},
+booktitle={The Thirteenth International Conference on Learning Representations},
+year={2025},
+url={https://openreview.net/forum?id=bjcsVLoHYs}
+}
+```
+5.2. If you create a derived dataset, you must clearly indicate that it is based on the Research-14K Dataset and include a link to the original dataset and this License.
+
+## 6. Data Origin and Limitations
+
+6.1.  The Dataset is derived from publicly available academic papers. We have made reasonable efforts to ensure data quality, but we do not guarantee its completeness, accuracy, or suitability for any particular purpose.
+
+6.2.  The Dataset may contain biases inherent in the original source materials. Users should be aware of these potential biases and consider them in their analyses.
+
+6.3 The Dataset is only available for the papers with CC BY 4.0, or CC BY-SA 4.0 ,or CC BY-NC-SA 4.0 ,or CC Zero license.
+
+## 7. No Warranty and Limitation of Liability
+
+7.1. The Dataset is provided "AS IS" without any warranty, express or implied.
+
+7.2. The creators and distributors of the Dataset are not liable for any damages arising from the use of the Dataset.
+
+## 8. Termination
+
+8.1. This License automatically terminates if you violate any of its terms.
+
+## 9. Updates and Modifications
+
+9.1. We reserve the right to update or modify this License at any time.  The most current version will be made available with the Dataset.
+
+## 10. Contact and Support
+
+For questions about this License or the Dataset:
+
+*   Email: wengsyx@gmail.com
+*   Website: https://wengsyx.github.io/Researcher/
+
+## 11. Governing Law and Jurisdiction.
+    a. This Agreement and any dispute arising out of or relating to it will be governed by the laws of China, without regard to conflict of law principles.
+    b. The People's Courts in Hangzhou City shall have exclusive jurisdiction over any dispute arising out of this Agreement.
+
+## 12. Notice
+Licensed under the Research-14K Dataset License
+Version 1.0, 2025/2/20
