@@ -82,17 +82,24 @@ def classify_with_bertopic(data_path, output_dir):
     # ------------------------------
 
     # Organize files into directories
-    for index, row in doc_info.iterrows():
+    # Use zip to ensure strict alignment between topic info and original data
+    if len(doc_info) != len(data_with_abstracts):
+        print(f"Warning: Mismatch in counts! doc_info: {len(doc_info)}, data: {len(data_with_abstracts)}")
+
+    for (index, row), original_item in zip(doc_info.iterrows(), data_with_abstracts):
         topic_id = row['Topic']
         topic_dir = os.path.join(output_dir, f"topic_{topic_id}")
         os.makedirs(topic_dir, exist_ok=True)
 
-        # The index from iterrows corresponds to the original list of abstracts
-        # and therefore to our `data_with_abstracts` list.
-        original_item = data_with_abstracts[index]
+        # original_item corresponds to the current row in doc_info
         title = original_item.get('title', 'No Title Provided')
         keywords = original_item.get('keywords', [])
-        year = original_item.get('year', 'Unknown')
+        
+        # Explicitly handle year
+        year = original_item.get('year')
+        if not year:
+            year = 'Unknown'
+            # print(f"Warning: Missing year for document index {index}")
 
         # Format the content to be saved
         content_to_save = f"Title: {title}\nYear: {year}\nKeywords: {', '.join(keywords)}"
