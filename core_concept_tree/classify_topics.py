@@ -100,9 +100,11 @@ def classify_with_bertopic(data_path, output_dir):
         if not year:
             year = 'Unknown'
             # print(f"Warning: Missing year for document index {index}")
+            
+        paper_id = original_item.get('paperId', 'Unknown')
 
         # Format the content to be saved
-        content_to_save = f"Title: {title}\nYear: {year}\nKeywords: {', '.join(keywords)}"
+        content_to_save = f"PaperId: {paper_id}\nTitle: {title}\nYear: {year}\nKeywords: {', '.join(keywords)}"
 
         # Use the document's original index as the filename
         file_path = os.path.join(topic_dir, f"doc_{index}.txt")

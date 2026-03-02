@@ -91,11 +91,15 @@ def classify_with_bertopic(data_path, output_dir):
         # and therefore to our `data_with_abstracts` list.
         original_item = data_with_abstracts[index]
         title = original_item.get('title', 'No Title Provided')
-        keywords = original_item.get('keywords', [])
+        paper_id = original_item.get('paperId', 'Unknown')
+        # keywords = original_item.get('keywords', [])
+        technical_keywords = original_item.get('technical_keywords', [])
+        ethical_keywords = original_item.get('ethical_keywords', [])
         year = original_item.get('year', 'Unknown')
 
         # Format the content to be saved
-        content_to_save = f"Title: {title}\nYear: {year}\nKeywords: {', '.join(keywords)}"
+        # content_to_save = f"Title: {title}\nYear: {year}\nKeywords: {', '.join(keywords)}"
+        content_to_save = f"PaperId: {paper_id}\nTitle: {title}\nYear: {year}\nTechnical Keywords: {', '.join(technical_keywords)}\nEthical Keywords: {', '.join(ethical_keywords)}"
 
         # Use the document's original index as the filename
         file_path = os.path.join(topic_dir, f"doc_{index}.txt")

@@ -66,7 +66,7 @@ def step1_propose_topics(r1_profile, r2_profile, cross_relations):
     JSON 格式要求如下：
     [
       {{
-        "title": "议题名称（尽量简短，适合做文件夹名）",
+        "title": "议题名称）",
         "description": "议题的详细描述，包括研究背景、必要性和预期创新点。",
         "sub_concepts": ["子概念1", "子概念2"], 
         "r1_nodes": [

@@ -10,7 +10,9 @@ import json
 
 def parse_file(file_path):
     year = 9999
-    keywords = []
+    title = "Unknown Title"
+    paper_id = "Unknown ID"
+    keywords = {'technical': [], 'ethical': []}
     with open(file_path, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
@@ -19,11 +21,26 @@ def parse_file(file_path):
                     year = int(line.replace("Year: ", "").strip())
                 except:
                     pass
+            elif line.startswith("Title: "):
+                title = line.replace("Title: ", "").strip()
+            elif line.startswith("PaperId: "):
+                paper_id = line.replace("PaperId: ", "").strip()
+            elif line.startswith("Technical Keywords: "):
+                kws = line.replace("Technical Keywords: ", "").strip()
+                if kws:
+                    keywords['technical'] = [k.strip() for k in kws.split(", ")]
+            elif line.startswith("Ethical Keywords: "):
+                kws = line.replace("Ethical Keywords: ", "").strip()
+                if kws:
+                    keywords['ethical'] = [k.strip() for k in kws.split(", ")]
+            # Backward compatibility or fallback
             elif line.startswith("Keywords: "):
                 kws = line.replace("Keywords: ", "").strip()
                 if kws:
-                    keywords = [k.strip() for k in kws.split(", ")]
-    return year, keywords
+                     # Default to technical if unknown? Or ignore?
+                     # Let's put in technical for now if mixed
+                     keywords['technical'].extend([k.strip() for k in kws.split(", ")])
+    return year, keywords, title, paper_id
 
 def normalize_keywords(all_keywords_list):
     """
@@ -182,6 +199,7 @@ def create_interactive_network(G, output_html_path, topic_name):
         year = G.nodes[n]['year']
         count = G.nodes[n].get('count', 1)
         core = G.nodes[n].get('core_number', 0)
+        papers_info = G.nodes[n].get('papers', 'No papers')
         
         # Explicitly set level based on year to ensure visual hierarchy matches time/color
         level = year_to_level.get(year, 0)
@@ -190,7 +208,14 @@ def create_interactive_network(G, output_html_path, topic_name):
         color_hex = mcolors.to_hex(rgba)
         
         # Tooltip
-        title_html = f"<b>{n}</b><br>Year: {year}<br>Count: {count}<br>Core: {core}"
+        title_html = (
+            f"<b>{n}</b><br>"
+            f"Year: {year}<br>"
+            f"Count: {count}<br>"
+            f"Core: {core}<br>"
+            f"<hr><b>Related Papers:</b><br>"
+            f"{papers_info}"
+        )
         
         # PyVis uses 'value' for size
         # Added 'level' to enforce year-based layering
@@ -203,17 +228,40 @@ def create_interactive_network(G, output_html_path, topic_name):
     # Apply options
     net.set_options(json.dumps(options))
     
+    # Custom injection of CSS for tooltip
+    # We need to save first, then append/modify the file
     try:
         net.save_graph(output_html_path)
+        
+        # Inject custom CSS for vis-tooltip
+        with open(output_html_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+            
+        custom_css = """
+        <style>
+            div.vis-tooltip {
+                max-width: 400px !important;
+                white-space: normal !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                font-size: 14px;
+            }
+        </style>
+        """
+        
+        if "</head>" in html_content:
+            html_content = html_content.replace("</head>", f"{custom_css}</head>")
+            with open(output_html_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+                
         print(f"Interactive network saved to {output_html_path}")
     except Exception as e:
         print(f"Failed to save interactive network: {e}")
 
-def create_cooccurrence_network(topic_dir, output_image_path, topic_info_df=None, output_html_path=None):
+def build_concept_graph(topic_dir, keyword_type='technical', topic_info_df=None):
     """
-    Creates a concept tree where each concept connects to the most strongly co-occurring
-    concept that appeared strictly earlier.
-    Merged semantic duplicates and ensures a single tree structure.
+    Builds the concept graph for a given topic and keyword type.
+    Returns: G (NetworkX DiGraph), first_year (dict), node_papers (dict)
     """
     topic_name = os.path.basename(topic_dir)
     
@@ -224,14 +272,15 @@ def create_cooccurrence_network(topic_dir, output_image_path, topic_info_df=None
     for filename in os.listdir(topic_dir):
         if filename.endswith(".txt"):
             file_path = os.path.join(topic_dir, filename)
-            year, keywords = parse_file(file_path)
+            year, keywords_dict, title, paper_id = parse_file(file_path)
+            keywords = keywords_dict.get(keyword_type, [])
             if keywords:
-                file_data.append((year, keywords))
+                file_data.append((year, keywords, title, paper_id))
                 all_keywords_lists.append(keywords)
                 
     if not file_data:
-        print(f"No keywords found in {topic_dir}")
-        return
+        print(f"No {keyword_type} keywords found in {topic_dir}")
+        return None, None, None
 
     # 2. Normalize keywords
     mapping = normalize_keywords(all_keywords_lists)
@@ -243,7 +292,7 @@ def create_cooccurrence_network(topic_dir, output_image_path, topic_info_df=None
     # We need word counts for tie-breaking
     word_counts = Counter()
     
-    for year, keywords in file_data:
+    for year, keywords, _, _ in file_data:
         norm_keywords = sorted(list(set([mapping[k] for k in keywords])))
         
         # Update word counts
@@ -287,18 +336,23 @@ def create_cooccurrence_network(topic_dir, output_image_path, topic_info_df=None
     # 3. Build Stats
     first_year = {}
     cooccurrence = defaultdict(lambda: defaultdict(int))
+    node_papers = defaultdict(list) # Stores list of formatted strings for display
+    node_paper_ids = defaultdict(set) # Stores set of paper IDs for logic
     
-    for year, keywords in file_data:
+    for year, keywords, title, paper_id in file_data:
         # Apply mapping and deduplicate per document
         norm_keywords = sorted(list(set([mapping[k] for k in keywords])))
         
         # Filter: Only keep valid keywords
         norm_keywords = [k for k in norm_keywords if k in valid_keywords]
         
-        # Update first year
+        # Update first year and papers
         for k in norm_keywords:
             if k not in first_year or year < first_year[k]:
                 first_year[k] = year
+            # Add paper info
+            node_papers[k].append(f"[{year}] {title}")
+            node_paper_ids[k].add(paper_id)
                 
         # Update co-occurrence
         for i in range(len(norm_keywords)):
@@ -312,7 +366,15 @@ def create_cooccurrence_network(topic_dir, output_image_path, topic_info_df=None
     sorted_keywords = sorted(first_year.keys(), key=lambda k: first_year[k])
     
     for kw in sorted_keywords:
-        G.add_node(kw, year=first_year[kw])
+        # Add node with papers info
+        # Deduplicate papers list just in case
+        unique_papers = sorted(list(set(node_papers[kw])))
+        # Limit paper list size in tooltip to avoid huge popups
+        papers_html = "<br>".join(unique_papers[:10])
+        if len(unique_papers) > 10:
+            papers_html += f"<br>...and {len(unique_papers)-10} more"
+            
+        G.add_node(kw, year=first_year[kw], papers=papers_html, paper_count=len(unique_papers), count=word_counts.get(kw, 0), core_number=core_numbers.get(kw, 0))
         
         candidates = []
         for neighbor, weight in cooccurrence[kw].items():
@@ -328,10 +390,6 @@ def create_cooccurrence_network(topic_dir, output_image_path, topic_info_df=None
     roots = [n for n in G.nodes() if G.in_degree(n) == 0]
     
     if not roots and G.number_of_nodes() > 0:
-        # If cycle exists, might have no roots? 
-        # But we constructed DAG... unless self-loops or cycles?
-        # Step 4 logic prevents cycles: "if appeared strictly earlier" or "earlier in list"
-        # So it should be a DAG.
         pass
 
     # Extract Topic ID from directory name (e.g., topic_0 -> 0)
@@ -342,63 +400,35 @@ def create_cooccurrence_network(topic_dir, output_image_path, topic_info_df=None
         
     root_label = get_topic_root_label(topic_id, topic_info_df)
     
-    best_root = None
-    
-    # Check if root_label exists in graph (normalized)
-    if root_label:
-        # Try to find exact match (case insensitive)
-        for n in G.nodes():
-            if n.lower() == root_label.lower():
-                best_root = n
-                break
+    # If no root found or explicit label available, add super-root
+    if (len(roots) > 1) or (root_label):
+        final_root = root_label if root_label else "Topic Root"
         
-        # If not found, we create it!
-        if not best_root:
-            best_root = root_label # Use the label as is (e.g. Title Case)
-            # Add to graph
-            # We need year for it. Set to min_year - 1
-            min_year_in_graph = min(first_year.values()) if first_year else 2020
-            G.add_node(best_root, year=min_year_in_graph - 1)
-            first_year[best_root] = min_year_in_graph - 1
+        # Add root node
+        if final_root not in G:
+            min_year = min(first_year.values()) if first_year else 2020
+            G.add_node(final_root, year=min_year, count=100, core_number=100) # Dummy high stats
             
-    # Fallback: Priority 2: Max Core Number, then Max Count, then Min Year
-    if not best_root and roots:
-        # Sort roots by: Core(desc), Count(desc), Year(asc)
-        roots.sort(key=lambda r: (-core_numbers.get(r, 0), -word_counts.get(r, 0), first_year.get(r, 9999)))
-        best_root = roots[0]
-        
-    # FORCE ROOT: If best_root exists, remove its incoming edges to prevent cycles
-    # This fixes the issue where an existing node selected as root has parents, 
-    # leading to bidirectional edges when we connect it to other roots.
-    if best_root and G.has_node(best_root):
-        in_edges = list(G.in_edges(best_root))
-        if in_edges:
-            G.remove_edges_from(in_edges)
-        
-    # Connect other roots to best_root
-    if best_root:
-        # Ensure best_root is in G (it might be added above)
-        # Identify current roots (in-degree 0) again, because if we added best_root, it is a root.
-        current_roots = [n for n in G.nodes() if G.in_degree(n) == 0]
-        
-        for r in current_roots:
-            if r != best_root:
-                # Add edge best_root -> r
-                G.add_edge(best_root, r, weight=1) 
-             
-        # Ensure best_root is visually at the top (earliest year)
-        # Check if best_root's year is <= all other nodes
-        # If we added it, it's already min - 1.
-        # If it was existing, we might need to push it up.
-        min_year_all = min([G.nodes[n]['year'] for n in G.nodes()])
-        if G.nodes[best_root]['year'] > min_year_all:
-             G.nodes[best_root]['year'] = min_year_all - 1
-             first_year[best_root] = min_year_all - 1
-         
-    # 6. Visualize
-    if G.number_of_nodes() == 0:
+        for r in roots:
+            if r != final_root:
+                G.add_edge(final_root, r, weight=1)
+                
+    return G, first_year, node_papers, node_paper_ids
+
+def create_cooccurrence_network(topic_dir, output_image_path, topic_info_df=None, output_html_path=None, keyword_type='technical'):
+    """
+    Creates a concept tree where each concept connects to the most strongly co-occurring
+    concept that appeared strictly earlier.
+    Merged semantic duplicates and ensures a single tree structure.
+    """
+    topic_name = os.path.basename(topic_dir)
+    
+    G, first_year, node_papers, node_paper_ids = build_concept_graph(topic_dir, keyword_type, topic_info_df)
+    
+    if G is None or G.number_of_nodes() == 0:
         return
 
+    # 6. Visualize
     plt.figure(figsize=(40, 40))
     
     pos = None
@@ -470,31 +500,38 @@ def process_all_topics(base_dir, output_dir):
             continue
             
         topic_name = os.path.basename(topic_dir)
-        output_image_path = os.path.join(output_dir, f"mst_core_network_{topic_name}.png")
-        output_html_path = os.path.join(html_dir, f"network_{topic_name}.html")
         
-        print(f"Processing {topic_name}...")
-        try:
-            create_cooccurrence_network(topic_dir, output_image_path, topic_info_df, output_html_path)
+        # Iterate over both keyword types
+        for k_type in ['technical', 'ethical']:
+            print(f"Processing {topic_name} - {k_type}...")
             
-            # Add to index list
-            if os.path.exists(output_html_path):
-                label = topic_name
-                if topic_info_df is not None:
-                    try:
-                        # Extract ID from topic_N
-                        parts = topic_name.split('_')
-                        if len(parts) > 1 and parts[1].isdigit():
-                            tid = int(parts[1])
-                            row = topic_info_df[topic_info_df['Topic'] == tid]
-                            if not row.empty and 'CustomLabel' in row.columns:
-                                label = f"{topic_name}: {row.iloc[0]['CustomLabel']}"
-                    except Exception as e:
-                        pass
-                generated_htmls.append((topic_name, label, f"network_{topic_name}.html"))
+            output_image_path = os.path.join(output_dir, f"mst_core_network_{topic_name}_{k_type}.png")
+            output_html_path = os.path.join(html_dir, f"network_{topic_name}_{k_type}.html")
+            
+            try:
+                create_cooccurrence_network(topic_dir, output_image_path, topic_info_df, output_html_path, keyword_type=k_type)
                 
-        except Exception as e:
-            print(f"Failed to process {topic_name}: {e}")
+                # Add to index list
+                if os.path.exists(output_html_path):
+                    label = topic_name
+                    if topic_info_df is not None:
+                        try:
+                            # Extract ID from topic_N
+                            parts = topic_name.split('_')
+                            if len(parts) > 1 and parts[1].isdigit():
+                                tid = int(parts[1])
+                                row = topic_info_df[topic_info_df['Topic'] == tid]
+                                if not row.empty and 'CustomLabel' in row.columns:
+                                    label = f"{topic_name}: {row.iloc[0]['CustomLabel']}"
+                        except Exception as e:
+                            pass
+                    
+                    # Append type to label
+                    label = f"{label} ({k_type.capitalize()})"
+                    generated_htmls.append((topic_name, label, f"network_{topic_name}_{k_type}.html"))
+                    
+            except Exception as e:
+                print(f"Failed to process {topic_name} ({k_type}): {e}")
 
     # Generate index.html
     try:

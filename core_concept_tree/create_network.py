@@ -11,6 +11,9 @@ import json
 def parse_file(file_path):
     year = 9999
     keywords = []
+    title = "Unknown Title"
+    paper_id = "Unknown"
+    
     with open(file_path, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
@@ -23,7 +26,12 @@ def parse_file(file_path):
                 kws = line.replace("Keywords: ", "").strip()
                 if kws:
                     keywords = [k.strip() for k in kws.split(", ")]
-    return year, keywords
+            elif line.startswith("Title: "):
+                title = line.replace("Title: ", "").strip()
+            elif line.startswith("PaperId: "):
+                paper_id = line.replace("PaperId: ", "").strip()
+                
+    return year, keywords, title, paper_id
 
 def normalize_keywords(all_keywords_list):
     """
@@ -182,6 +190,7 @@ def create_interactive_network(G, output_html_path, topic_name):
         year = G.nodes[n]['year']
         count = G.nodes[n].get('count', 1)
         core = G.nodes[n].get('core_number', 0)
+        papers_info = G.nodes[n].get('papers', 'No papers')
         
         # Explicitly set level based on year to ensure visual hierarchy matches time/color
         level = year_to_level.get(year, 0)
@@ -190,7 +199,14 @@ def create_interactive_network(G, output_html_path, topic_name):
         color_hex = mcolors.to_hex(rgba)
         
         # Tooltip
-        title_html = f"<b>{n}</b><br>Year: {year}<br>Count: {count}<br>Core: {core}"
+        title_html = (
+            f"<b>{n}</b><br>"
+            f"Year: {year}<br>"
+            f"Count: {count}<br>"
+            f"Core: {core}<br>"
+            f"<hr><b>Related Papers:</b><br>"
+            f"{papers_info}"
+        )
         
         # PyVis uses 'value' for size
         # Added 'level' to enforce year-based layering
@@ -205,6 +221,26 @@ def create_interactive_network(G, output_html_path, topic_name):
     
     try:
         net.save_graph(output_html_path)
+        
+        # Inject custom CSS for vis-tooltip
+        with open(output_html_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+            
+        custom_css = """
+        <style>
+            div.vis-tooltip {
+                max-width: 400px !important;
+                white-space: normal !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                font-size: 14px;
+            }
+        </style>
+        """
+        html_content = html_content.replace("</head>", f"{custom_css}</head>")
+        with open(output_html_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+
         print(f"Interactive network saved to {output_html_path}")
     except Exception as e:
         print(f"Failed to save interactive network: {e}")
@@ -218,15 +254,15 @@ def create_cooccurrence_network(topic_dir, output_image_path, topic_info_df=None
     topic_name = os.path.basename(topic_dir)
     
     # 1. First Pass: Read all data to memory for normalization
-    file_data = [] # List of (year, [keywords])
+    file_data = [] # List of (year, keywords, title, paper_id)
     all_keywords_lists = []
     
     for filename in os.listdir(topic_dir):
         if filename.endswith(".txt"):
             file_path = os.path.join(topic_dir, filename)
-            year, keywords = parse_file(file_path)
+            year, keywords, title, paper_id = parse_file(file_path)
             if keywords:
-                file_data.append((year, keywords))
+                file_data.append((year, keywords, title, paper_id))
                 all_keywords_lists.append(keywords)
                 
     if not file_data:
@@ -243,7 +279,7 @@ def create_cooccurrence_network(topic_dir, output_image_path, topic_info_df=None
     # We need word counts for tie-breaking
     word_counts = Counter()
     
-    for year, keywords in file_data:
+    for year, keywords, _, _ in file_data:
         norm_keywords = sorted(list(set([mapping[k] for k in keywords])))
         
         # Update word counts
@@ -287,18 +323,21 @@ def create_cooccurrence_network(topic_dir, output_image_path, topic_info_df=None
     # 3. Build Stats
     first_year = {}
     cooccurrence = defaultdict(lambda: defaultdict(int))
+    node_papers = defaultdict(list) # Stores list of (paper_id, title) for each keyword
     
-    for year, keywords in file_data:
+    for year, keywords, title, paper_id in file_data:
         # Apply mapping and deduplicate per document
         norm_keywords = sorted(list(set([mapping[k] for k in keywords])))
         
         # Filter: Only keep valid keywords
         norm_keywords = [k for k in norm_keywords if k in valid_keywords]
         
-        # Update first year
+        # Update first year and papers
         for k in norm_keywords:
             if k not in first_year or year < first_year[k]:
                 first_year[k] = year
+            # Add paper info
+            node_papers[k].append(f"[{year}] {title}")
                 
         # Update co-occurrence
         for i in range(len(norm_keywords)):
@@ -312,7 +351,15 @@ def create_cooccurrence_network(topic_dir, output_image_path, topic_info_df=None
     sorted_keywords = sorted(first_year.keys(), key=lambda k: first_year[k])
     
     for kw in sorted_keywords:
-        G.add_node(kw, year=first_year[kw])
+        # Add node with papers info
+        # Deduplicate papers list just in case
+        unique_papers = sorted(list(set(node_papers[kw])))
+        # Limit paper list size in tooltip to avoid huge popups
+        papers_html = "<br>".join(unique_papers[:10])
+        if len(unique_papers) > 10:
+            papers_html += f"<br>...and {len(unique_papers)-10} more"
+            
+        G.add_node(kw, year=first_year[kw], papers=papers_html, count=word_counts.get(kw, 0), core_number=core_numbers.get(kw, 0))
         
         candidates = []
         for neighbor, weight in cooccurrence[kw].items():
