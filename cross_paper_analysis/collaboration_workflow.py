@@ -4,9 +4,29 @@ import re
 from openai import OpenAI
 from proposal_visualization import visualize_proposal_graph
 
-# 设置 API Key 和 Base URL
-# 在实际运行时，请确保环境变量 OPENROUTER_API_KEY 已设置
-API_KEY = "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"
+
+
+def load_api_key():
+    try:
+        # Get the directory of the current script
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # Go up one level to project root
+        project_root = os.path.dirname(current_dir)
+        key_file_path = os.path.join(project_root, 'API_KEY.md')
+        
+        if os.path.exists(key_file_path):
+            with open(key_file_path, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                # Parse key from format: API_KEY = "..."
+                match = re.search(r'API_KEY\s*=\s*["\'](.+?)["\']', content)
+                if match:
+                    return match.group(1)
+                return content
+    except Exception:
+        pass
+    return os.environ.get("OPENROUTER_API_KEY")
+
+API_KEY = load_api_key()
 BASE_URL = "https://openrouter.ai/api/v1"
 YOUR_SITE_URL = "https://trae.ai" 
 YOUR_SITE_NAME = "ResearchAgent"
