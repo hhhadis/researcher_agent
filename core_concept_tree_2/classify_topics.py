@@ -3,10 +3,26 @@ import os
 import json
 import pandas as pd
 from bertopic import BERTopic
+import re
 from zhipuai import ZhipuAI
 
 # API Key
-ZHIPUAI_API_KEY = "77e73e22741f4b45854c777f4763236f.311YBhRcPuEQk3ZQ"
+def load_zhipuai_api_key():
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        key_file_path = os.path.join(project_root, 'API_KEY.md')
+        if os.path.exists(key_file_path):
+            with open(key_file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                match = re.search(r'ZHIPUAI_API_KEY\s*=\s*["\'](.+?)["\']', content)
+                if match:
+                    return match.group(1)
+    except Exception:
+        pass
+    return os.environ.get("ZHIPUAI_API_KEY")
+
+ZHIPUAI_API_KEY = load_zhipuai_api_key()
 
 def generate_topic_label(keywords, client):
     if not keywords:

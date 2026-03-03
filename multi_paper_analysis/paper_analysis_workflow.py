@@ -5,7 +5,22 @@ from openai import OpenAI
 from paper_visualization import visualize_paper_graph
 
 # Setup API
-API_KEY = "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"
+def load_api_key():
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        key_file_path = os.path.join(project_root, 'API_KEY.md')
+        if os.path.exists(key_file_path):
+            with open(key_file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                match = re.search(r'API_KEY\s*=\s*["\'](.+?)["\']', content)
+                if match:
+                    return match.group(1)
+    except Exception:
+        pass
+    return os.environ.get("OPENROUTER_API_KEY")
+
+API_KEY = load_api_key()
 BASE_URL = "https://openrouter.ai/api/v1"
 YOUR_SITE_URL = "https://trae.ai" 
 YOUR_SITE_NAME = "ResearchAgent"
